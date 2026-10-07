@@ -40,10 +40,20 @@ Google 캘린더 일정을 iCal 주소로 읽어 보여 준다. 일정 추가와
 - 창 가장자리/모서리 드래그: 크기 조절
 - 우클릭 메뉴: `새로 고침`, `닫기`
 
-## 실행
+## 개발 중 실행
 
 저장소 최상위에서 실행한다.
 
 ```powershell
 dotnet run
 ```
+
+## 설치와 업데이트
+
+실행 중인 달력을 우클릭 > `닫기`로 닫은 뒤, 저장소 최상위에서 배포한다. 업데이트도 같은 명령이다.
+
+```powershell
+dotnet publish -c Release -o "$env:LOCALAPPDATA\Programs\DesktopCalendar"
+```
+
+로그인할 때 자동으로 띄우려면 시작프로그램 폴더(`Win + R` > `shell:startup`)에 `%LOCALAPPDATA%\Programs\DesktopCalendar\DesktopCalendar.exe`의 바로 가기를 둔다. .NET 10 Desktop Runtime이 설치되어 있어야 한다.
