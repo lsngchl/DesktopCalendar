@@ -12,8 +12,10 @@ public sealed class DesktopHostService
     private const uint GwOwner = 4;
     private const long WsExToolWindow = 0x00000080L;
     private const long WsExAppWindow = 0x00040000L;
+    private const int SwpNoZOrder = 0x0004;
     private const int SwpNoActivate = 0x0010;
     private const int SwpShowWindow = 0x0040;
+    private const long MaxLogBytes = 64 * 1024;
     private static readonly nint HwndBottom = new(1);
 
     private nint _desktopHost;
@@ -64,6 +66,20 @@ public sealed class DesktopHostService
         Position(window, handle);
     }
 
+    // Handles WM_WINDOWPOSCHANGING: activation (for example by the context menu) would raise the
+    // window above other apps, so every z-order change is redirected to the bottom.
+    public static void KeepAtBottom(nint windowPosPointer)
+    {
+        var position = Marshal.PtrToStructure<WindowPos>(windowPosPointer);
+        if ((position.Flags & SwpNoZOrder) != 0 || position.InsertAfter == HwndBottom)
+        {
+            return;
+        }
+
+        position.InsertAfter = HwndBottom;
+        Marshal.StructureToPtr(position, windowPosPointer, false);
+    }
+
     private static void Position(Window window, nint handle)
     {
         var dpi = VisualTreeHelper.GetDpi(window);
@@ -93,11 +109,6 @@ public sealed class DesktopHostService
             progman = FindWindow("Progman", null);
         }
 
-        if (progman != nint.Zero)
-        {
-            SendMessageTimeout(progman, 0x052C, nint.Zero, nint.Zero, 0, 1000, out _);
-        }
-
         return progman;
     }
 
@@ -125,13 +136,30 @@ public sealed class DesktopHostService
         try
         {
             AppPaths.Ensure();
-            var line = $"{DateTimeOffset.Now:O} {message}{Environment.NewLine}";
-            File.AppendAllText(Path.Combine(AppPaths.AppDataRoot, "desktop-host.log"), line);
+            var path = Path.Combine(AppPaths.AppDataRoot, "desktop-host.log");
+            if (File.Exists(path) && new FileInfo(path).Length > MaxLogBytes)
+            {
+                File.Move(path, path + ".old", overwrite: true);
+            }
+
+            File.AppendAllText(path, $"{DateTimeOffset.Now:O} {message}{Environment.NewLine}");
         }
         catch
         {
             // Desktop attachment must not depend on diagnostic logging.
         }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowPos
+    {
+        public nint Handle;
+        public nint InsertAfter;
+        public int X;
+        public int Y;
+        public int Width;
+        public int Height;
+        public int Flags;
     }
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -157,7 +185,4 @@ public sealed class DesktopHostService
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
     private static extern int SetWindowLong32(nint hWnd, int nIndex, int dwNewLong);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern nint SendMessageTimeout(nint hWnd, uint msg, nint wParam, nint lParam, uint flags, uint timeout, out nint result);
 }

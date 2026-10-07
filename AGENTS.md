@@ -10,7 +10,7 @@
 
 - `App.xaml`, `MainWindow.xaml(.cs)`: the window, month grid, drag, edge resize, and refresh timers.
 - `Models`: plain view and settings types.
-- `Services/DesktopHostService.cs`: keeps the window on the desktop layer (`Progman` as owner, tool window style, `HWND_BOTTOM` every 3 s). It is stable; change it only with a manual check after `Win + D`, Explorer restart, and drag.
+- `Services/DesktopHostService.cs`: keeps the window on the desktop layer (`Progman` as owner, tool window style, `HWND_BOTTOM` every 3 s, and every z-order change in `WM_WINDOWPOSCHANGING` redirected to the bottom so activation by the context menu does not raise it). It is stable; change it only with a manual check after `Win + D`, Explorer restart, drag, and opening the context menu.
 - `Services/WindowBackdropService.cs`: acrylic blur through `SetWindowCompositionAttribute`.
 - `Services/CalendarFeedService.cs`: reads `calendars.json`, downloads and caches feeds, expands occurrences with Ical.Net.
 - `Services/KoreanHolidayService.cs`: holiday rules plus the public Google holiday feed.

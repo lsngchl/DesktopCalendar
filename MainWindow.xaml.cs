@@ -15,6 +15,7 @@ namespace DesktopCalendar;
 
 public partial class MainWindow : Window
 {
+    private const int WmWindowPosChanging = 0x0046;
     private const int WmNcHitTest = 0x0084;
     private const int HtLeft = 10;
     private const int HtRight = 11;
@@ -26,8 +27,6 @@ public partial class MainWindow : Window
     private const int HtBottomRight = 17;
     private const int ResizeBorderPixels = 12;
     private const int WmMouseActivate = 0x0021;
-    private const int WmLeftButtonDoubleClick = 0x0203;
-    private const int MaActivate = 1;
     private const int MaNoActivate = 3;
     // Layout sizes mirrored from MainWindow.xaml, used to decide how many events fit in a day cell.
     private const double CellVerticalChrome = 17;
@@ -90,7 +89,6 @@ public partial class MainWindow : Window
         source?.AddHook(WndProc);
         WindowBackdropService.EnableAcrylic(this);
         ShowInTaskbar = false;
-        Topmost = false;
     }
 
     private void Window_Activated(object? sender, EventArgs e)
@@ -410,11 +408,8 @@ public partial class MainWindow : Window
 
     private void AttachToDesktop()
     {
-        ShowInTaskbar = false;
-        Topmost = false;
         _suppressBoundsSave = true;
         ApplySavedBounds();
-        WindowBackdropService.EnableAcrylic(this);
         _desktopHost.Attach(this);
         _ = Dispatcher.BeginInvoke(() =>
         {
@@ -427,11 +422,16 @@ public partial class MainWindow : Window
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
     {
+        if (msg == WmWindowPosChanging)
+        {
+            DesktopHostService.KeepAtBottom(lParam);
+            return nint.Zero;
+        }
+
         if (msg == WmMouseActivate)
         {
-            var mouseMessage = GetSignedHighWord(lParam);
             handled = true;
-            return mouseMessage == WmLeftButtonDoubleClick ? MaActivate : MaNoActivate;
+            return MaNoActivate;
         }
 
         if (msg != WmNcHitTest || WindowState != WindowState.Normal || _isDraggingShell)
