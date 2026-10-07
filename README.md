@@ -9,11 +9,18 @@ Google 캘린더 일정을 iCal 주소로 읽어 보여 준다. 일정 추가와
 - `App.xaml`, `MainWindow.xaml`: 앱 진입점과 달력 화면
 - `Models`: 설정, 날짜 칸, 일정, 캘린더 주소
 - `Services`: 바탕화면 부착, 반투명 배경, iCal 피드, 공휴일 계산, 설정 저장
+- `scripts\add-calendar.ps1`: 캘린더 주소 입력 도구
 
 ## 캘린더 연결
 
 1. Google 캘린더 웹에서 설정 > 왼쪽의 캘린더 이름 > `캘린더 통합` > `iCal 형식의 비공개 주소`를 복사한다.
-2. `%APPDATA%\DesktopCalendar\calendars.json`에 캘린더마다 한 줄씩 넣는다. 앱을 처음 실행하면 예시가 담긴 파일이 생긴다.
+2. 저장소 최상위에서 입력 도구를 실행하고, 안내에 따라 주소와 색을 붙여 넣는다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\add-calendar.ps1
+```
+
+입력 도구는 `%APPDATA%\DesktopCalendar\calendars.json`에 다음 형식으로 저장한다. 직접 편집해도 된다.
 
 ```json
 [
@@ -21,7 +28,9 @@ Google 캘린더 일정을 iCal 주소로 읽어 보여 준다. 일정 추가와
 ]
 ```
 
-비공개 주소는 그 캘린더를 누구나 읽을 수 있게 하는 비밀번호와 같으므로 저장소나 다른 곳에 올리지 않는다. 앱은 5분마다, 그리고 우클릭 메뉴의 `새로 고침`으로 다시 읽는다.
+비공개 주소는 그 캘린더를 누구나 읽을 수 있게 하는 비밀번호와 같으므로 저장소나 다른 곳에 올리지 않는다. 입력 도구는 주소를 저장하기 전에 `calendars.json`과 `cache` 폴더의 권한을 현재 계정, SYSTEM, Administrators로 좁혀 샌드박스에서 도는 에이전트가 읽지 못하게 한다. 주소가 새어 나갔다면 Google 캘린더 설정에서 비공개 주소를 재설정한다.
+
+앱은 5분마다, 그리고 우클릭 메뉴의 `새로 고침`으로 다시 읽는다.
 
 ## 공휴일
 
