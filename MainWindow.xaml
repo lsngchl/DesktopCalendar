@@ -124,8 +124,9 @@
         <Style x:Key="EventText" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#F4FFFFFF" />
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Effect">
                 <Setter.Value>
                     <DropShadowEffect Color="#E6000000" BlurRadius="3" ShadowDepth="1" Opacity="0.9" />
@@ -139,9 +140,22 @@
             <Setter Property="Margin" Value="3,0,0,0" />
         </Style>
 
+        <Style x:Key="MonthText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#EEF8FCFF" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#DD000000" BlurRadius="2" ShadowDepth="1" Opacity="0.85" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="StatusText" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#FFFFB9B1" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="14,0,0,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
     </Window.Resources>
@@ -172,9 +186,14 @@
                     BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TopBar_MouseLeftButtonDown">
                 <Grid Margin="8,0">
-                    <TextBlock x:Name="StatusText"
-                               Margin="4,0,0,0"
-                               Style="{StaticResource StatusText}" />
+                    <StackPanel Orientation="Horizontal"
+                                Margin="6,0,0,0"
+                                VerticalAlignment="Center">
+                        <TextBlock x:Name="MonthText"
+                                   Style="{StaticResource MonthText}" />
+                        <TextBlock x:Name="StatusText"
+                                   Style="{StaticResource StatusText}" />
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center">
@@ -214,9 +233,8 @@
                                 <ItemsControl ItemsSource="{Binding Events}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate DataType="{x:Type models:DayEvent}">
-                                            <Border Height="17"
-                                                    Margin="0,0,0,1"
-                                                    Padding="3,0"
+                                            <Border Margin="0,0,0,1"
+                                                    Padding="3,1"
                                                     CornerRadius="3"
                                                     Background="{Binding Background}">
                                                 <Grid>
@@ -227,8 +245,8 @@
                                                     <Ellipse x:Name="Dot"
                                                              Width="6"
                                                              Height="6"
-                                                             Margin="0,0,5,0"
-                                                             VerticalAlignment="Center"
+                                                             Margin="0,5,5,0"
+                                                             VerticalAlignment="Top"
                                                              Fill="{Binding Color}" />
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding Text}"

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
@@ -28,10 +29,16 @@ public partial class MainWindow : Window
     private const int WmLeftButtonDoubleClick = 0x0203;
     private const int MaActivate = 1;
     private const int MaNoActivate = 3;
-    private const double CellVerticalPadding = 16;
+    // Layout sizes mirrored from MainWindow.xaml, used to decide how many events fit in a day cell.
+    private const double CellVerticalChrome = 20;
+    private const double CellHorizontalChrome = 34;
     private const double DateLineHeight = 18;
     private const double HolidayLineHeight = 20;
-    private const double EventLineHeight = 18;
+    private const double EventFontSize = 12;
+    private const double EventLineHeight = 16;
+    private const double EventChromeHeight = 3;
+    private const double EventDotWidth = 11;
+    private const double MoreLineHeight = 16;
     private static readonly TimeSpan FeedRefreshInterval = TimeSpan.FromMinutes(5);
 
     private readonly SettingsService _settingsService = new();
@@ -46,6 +53,7 @@ public partial class MainWindow : Window
     private DateTime _currentMonth;
     private DateTime? _eventsRangeStart;
     private Dictionary<DateOnly, List<DayEvent>> _events = [];
+    private double _cellWidth;
     private double _cellHeight;
     private bool _isRefreshing;
     private bool _suppressBoundsSave;
@@ -251,12 +259,14 @@ public partial class MainWindow : Window
 
     private void DaysGrid_SizeChanged(object sender, SizeChangedEventArgs e)
     {
+        var cellWidth = Math.Floor(e.NewSize.Width / 7);
         var cellHeight = Math.Floor(e.NewSize.Height / 6);
-        if (cellHeight == _cellHeight)
+        if (cellWidth == _cellWidth && cellHeight == _cellHeight)
         {
             return;
         }
 
+        _cellWidth = cellWidth;
         _cellHeight = cellHeight;
         BuildDays();
     }
@@ -267,6 +277,7 @@ public partial class MainWindow : Window
         var start = first.AddDays(-(int)first.DayOfWeek);
         var last = start.AddDays(41);
         var holidays = _holidayService.GetHolidays(start, last, _feeds.Holidays);
+        MonthText.Text = $"{first.Year}년 {first.Month}월";
         if (_eventsRangeStart != start)
         {
             _events = _feeds.GetEvents(DateOnly.FromDateTime(start), DateOnly.FromDateTime(last));
@@ -300,15 +311,45 @@ public partial class MainWindow : Window
 
     private (IReadOnlyList<DayEvent> Events, string MoreText) FitEvents(List<DayEvent> events, bool hasHoliday)
     {
-        var available = _cellHeight - CellVerticalPadding - DateLineHeight - (hasHoliday ? HolidayLineHeight : 0);
-        var lines = Math.Max(0, (int)(available / EventLineHeight));
-        if (events.Count <= lines)
+        if (_cellWidth <= 0 || events.Count == 0)
         {
-            return (events, "");
+            return ([], "");
         }
 
-        var shown = Math.Max(0, lines - 1);
-        return (events.Take(shown).ToList(), $"+{events.Count - shown}");
+        var available = _cellHeight - CellVerticalChrome - DateLineHeight - (hasHoliday ? HolidayLineHeight : 0);
+        var shown = new List<DayEvent>();
+        for (var index = 0; index < events.Count; index++)
+        {
+            var height = MeasureEvent(events[index]);
+            var reserve = index == events.Count - 1 ? 0 : MoreLineHeight;
+            if (shown.Count > 0 && height + reserve > available)
+            {
+                break;
+            }
+
+            shown.Add(events[index]);
+            available -= height;
+        }
+
+        return shown.Count == events.Count ? (events, "") : (shown, $"+{events.Count - shown.Count}");
+    }
+
+    private double MeasureEvent(DayEvent calendarEvent)
+    {
+        var width = Math.Max(1, _cellWidth - CellHorizontalChrome - (calendarEvent.IsAllDay ? 0 : EventDotWidth));
+        var text = new FormattedText(
+            calendarEvent.Text,
+            CultureInfo.CurrentUICulture,
+            FlowDirection.LeftToRight,
+            new Typeface(FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
+            EventFontSize,
+            Brushes.White,
+            VisualTreeHelper.GetDpi(this).PixelsPerDip)
+        {
+            MaxTextWidth = width,
+            LineHeight = EventLineHeight
+        };
+        return text.Height + EventChromeHeight;
     }
 
     private void Close_Click(object sender, RoutedEventArgs e)
