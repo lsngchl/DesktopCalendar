@@ -4,7 +4,9 @@ namespace DesktopCalendar.Models;
 
 public sealed class DayEvent
 {
-    public string Text { get; init; } = "";
+    public string Time { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Text => Time + Title;
     public bool IsAllDay { get; init; }
     public DateTime Start { get; init; }
     public Brush Color { get; init; } = Brushes.Transparent;

@@ -30,9 +30,9 @@ public partial class MainWindow : Window
     private const int MaActivate = 1;
     private const int MaNoActivate = 3;
     // Layout sizes mirrored from MainWindow.xaml, used to decide how many events fit in a day cell.
-    private const double CellVerticalChrome = 20;
-    private const double CellHorizontalChrome = 34;
-    private const double DateLineHeight = 18;
+    private const double CellVerticalChrome = 17;
+    private const double CellHorizontalChrome = 30;
+    private const double DateLineHeight = 24;
     private const double HolidayLineHeight = 20;
     private const double EventFontSize = 12;
     private const double EventLineHeight = 16;
@@ -185,6 +185,12 @@ public partial class MainWindow : Window
         BuildDays();
     }
 
+    private void Today_Click(object sender, RoutedEventArgs e)
+    {
+        _currentMonth = new DateTime(_today.Year, _today.Month, 1);
+        BuildDays();
+    }
+
     private void Next_Click(object sender, RoutedEventArgs e)
     {
         _currentMonth = _currentMonth.AddMonths(1);
@@ -277,7 +283,8 @@ public partial class MainWindow : Window
         var start = first.AddDays(-(int)first.DayOfWeek);
         var last = start.AddDays(41);
         var holidays = _holidayService.GetHolidays(start, last, _feeds.Holidays);
-        MonthText.Text = $"{first.Year}년 {first.Month}월";
+        MonthRun.Text = $"{first.Month}월";
+        YearRun.Text = $" {first.Year}";
         if (_eventsRangeStart != start)
         {
             _events = _feeds.GetEvents(DateOnly.FromDateTime(start), DateOnly.FromDateTime(last));

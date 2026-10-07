@@ -7,6 +7,8 @@ namespace DesktopCalendar.Services;
 public static class WindowBackdropService
 {
     private const int WcaAccentPolicy = 19;
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwcpRound = 2;
 
     public static void EnableAcrylic(Window window)
     {
@@ -20,6 +22,10 @@ public static class WindowBackdropService
         {
             SetAccent(handle, AccentState.EnableBlurBehind, alpha: 0x16);
         }
+
+        // Rounds the blurred backdrop to match the rounded border on Windows 11; older versions ignore it.
+        var corner = DwmwcpRound;
+        DwmSetWindowAttribute(handle, DwmwaWindowCornerPreference, ref corner, sizeof(int));
     }
 
     private static bool SetAccent(nint handle, AccentState state, byte alpha)
@@ -83,6 +89,9 @@ public static class WindowBackdropService
         public nint Data;
         public int SizeOfData;
     }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowCompositionAttribute(nint hwnd, ref WindowCompositionAttributeData data);

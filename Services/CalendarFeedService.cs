@@ -126,7 +126,7 @@ public sealed class CalendarFeedService
             events.Sort((left, right) =>
                 left.IsAllDay != right.IsAllDay ? (left.IsAllDay ? -1 : 1)
                 : left.Start != right.Start ? left.Start.CompareTo(right.Start)
-                : string.CompareOrdinal(left.Text, right.Text));
+                : string.CompareOrdinal(left.Title, right.Title));
         }
 
         return result;
@@ -171,7 +171,8 @@ public sealed class CalendarFeedService
 
             events.Add(new DayEvent
             {
-                Text = isAllDay || day != startDay ? title : $"{startLocal:HH:mm} {title}",
+                Time = isAllDay || day != startDay ? "" : $"{startLocal:HH:mm} ",
+                Title = title,
                 IsAllDay = isAllDay,
                 Start = startLocal,
                 Color = color,
