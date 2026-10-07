@@ -9,7 +9,6 @@ public static class AppPaths
         "DesktopCalendar");
 
     public static string SettingsPath => Path.Combine(AppDataRoot, "settings.json");
-    public static string LocalStorePath => Path.Combine(AppDataRoot, "local-events.json");
 
     public static void Ensure()
     {

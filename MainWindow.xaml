@@ -120,41 +120,6 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="MemoText" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#F4FFFFFF" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="LineHeight" Value="17" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="#E6000000" BlurRadius="3" ShadowDepth="1" Opacity="0.9" />
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="MemoEditor" TargetType="TextBox">
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Setter Property="AcceptsReturn" Value="True" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="#F1CF4A" />
-            <Setter Property="Background" Value="#FFFFFEF3" />
-            <Setter Property="Foreground" Value="#18222A" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Padding" Value="6,4" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                    <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
     </Window.Resources>
 
     <Border x:Name="CalendarShell"
@@ -186,7 +151,6 @@
                                 VerticalAlignment="Center">
                         <Button Style="{StaticResource ToolbarButton}" Content="&lt;" ToolTip="이전 달" Click="Previous_Click" />
                         <Button Style="{StaticResource ToolbarButton}" Content="&gt;" ToolTip="다음 달" Click="Next_Click" />
-                        <Button Style="{StaticResource ToolbarButton}" Content="↻" ToolTip="동기화" Click="SyncNow_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -209,31 +173,13 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type models:CalendarDay}">
-                        <Border Style="{StaticResource CalendarCell}"
-                                MouseLeftButtonDown="DayCell_MouseLeftButtonDown">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
-
-                                <StackPanel MinHeight="28">
-                                    <TextBlock Text="{Binding DayText}"
-                                               Style="{StaticResource DateText}" />
-                                    <TextBlock Text="{Binding HolidayName}"
-                                               Style="{StaticResource HolidayText}" />
-                                </StackPanel>
-
-                                <Grid Grid.Row="1">
-                                    <TextBlock Text="{Binding Text}"
-                                               Style="{StaticResource MemoText}" />
-                                    <TextBox Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             Style="{StaticResource MemoEditor}"
-                                             Loaded="MemoEditor_Loaded"
-                                             LostFocus="MemoEditor_LostFocus"
-                                             KeyDown="MemoEditor_KeyDown" />
-                                </Grid>
-                            </Grid>
+                        <Border Style="{StaticResource CalendarCell}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding DayText}"
+                                           Style="{StaticResource DateText}" />
+                                <TextBlock Text="{Binding HolidayName}"
+                                           Style="{StaticResource HolidayText}" />
+                            </StackPanel>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

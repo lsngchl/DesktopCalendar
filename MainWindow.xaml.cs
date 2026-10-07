@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -30,17 +29,12 @@ public partial class MainWindow : Window
     private const int MaNoActivate = 3;
 
     private readonly SettingsService _settingsService = new();
-    private readonly DriveMemoSyncService _syncService = new();
     private readonly KoreanHolidayService _holidayService = new();
     private readonly DesktopHostService _desktopHost = new();
     private readonly DispatcherTimer _desktopRepairTimer = new();
 
     private AppSettings _settings;
-    private Dictionary<string, CalendarMemo> _memos;
     private DateTime _currentMonth;
-    private CalendarDay? _editingDay;
-    private string _editingOriginalText = "";
-    private bool _isSavingEditor;
     private bool _suppressBoundsSave;
     private bool _isDraggingShell;
     private Point _dragStartScreen;
@@ -50,7 +44,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         _settings = _settingsService.Load();
-        _memos = _syncService.LoadLocal();
         _currentMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
 
         DataContext = this;
@@ -63,9 +56,8 @@ public partial class MainWindow : Window
 
     public ObservableCollection<CalendarDay> Days { get; } = [];
 
-    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        await SyncAndRenderAsync();
         _ = Dispatcher.BeginInvoke(AttachToDesktop, DispatcherPriority.ApplicationIdle);
     }
 
@@ -120,24 +112,16 @@ public partial class MainWindow : Window
         _desktopRepairTimer.Start();
     }
 
-    private async void Previous_Click(object sender, RoutedEventArgs e)
+    private void Previous_Click(object sender, RoutedEventArgs e)
     {
-        await CommitActiveEditorAsync();
         _currentMonth = _currentMonth.AddMonths(-1);
         BuildDays();
     }
 
-    private async void Next_Click(object sender, RoutedEventArgs e)
+    private void Next_Click(object sender, RoutedEventArgs e)
     {
-        await CommitActiveEditorAsync();
         _currentMonth = _currentMonth.AddMonths(1);
         BuildDays();
-    }
-
-    private async void SyncNow_Click(object sender, RoutedEventArgs e)
-    {
-        await CommitActiveEditorAsync();
-        await SyncAndRenderAsync();
     }
 
     private void TopBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -186,112 +170,6 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private async void DayCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.ClickCount != 2 || sender is not FrameworkElement { DataContext: CalendarDay day })
-        {
-            return;
-        }
-
-        await CommitActiveEditorAsync();
-        _editingDay = day;
-        _editingOriginalText = day.Text;
-        day.IsEditing = true;
-        e.Handled = true;
-    }
-
-    private void MemoEditor_Loaded(object sender, RoutedEventArgs e)
-    {
-        if (sender is TextBox textBox && textBox.DataContext is CalendarDay { IsEditing: true })
-        {
-            textBox.Dispatcher.BeginInvoke(() =>
-            {
-                textBox.Focus();
-                textBox.SelectAll();
-            }, DispatcherPriority.Input);
-        }
-    }
-
-    private async void MemoEditor_LostFocus(object sender, RoutedEventArgs e)
-    {
-        if (sender is TextBox { DataContext: CalendarDay day } && day.IsEditing)
-        {
-            await CommitEditorAsync(day);
-        }
-    }
-
-    private async void MemoEditor_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (sender is not TextBox { DataContext: CalendarDay day })
-        {
-            return;
-        }
-
-        if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
-        {
-            e.Handled = true;
-            await CommitEditorAsync(day);
-            Keyboard.ClearFocus();
-            return;
-        }
-
-        if (e.Key == Key.Escape)
-        {
-            e.Handled = true;
-            day.Text = _editingOriginalText;
-            day.IsEditing = false;
-            _editingDay = null;
-            Keyboard.ClearFocus();
-        }
-    }
-
-    private async Task CommitActiveEditorAsync()
-    {
-        if (_editingDay is not null)
-        {
-            await CommitEditorAsync(_editingDay);
-        }
-    }
-
-    private async Task CommitEditorAsync(CalendarDay day)
-    {
-        if (_isSavingEditor)
-        {
-            return;
-        }
-
-        _isSavingEditor = true;
-        try
-        {
-            day.IsEditing = false;
-            _editingDay = null;
-
-            _memos.TryGetValue(day.Key, out var previous);
-            var memo = _syncService.CreateMemo(day.Text, previous);
-            _memos[day.Key] = memo;
-            _syncService.SaveLocal(_memos);
-            await SyncAndRenderAsync();
-        }
-        finally
-        {
-            _isSavingEditor = false;
-        }
-    }
-
-    private async Task SyncAndRenderAsync()
-    {
-        try
-        {
-            _memos = await _syncService.SyncAsync(_settings, _memos);
-        }
-        catch
-        {
-            _syncService.SaveLocal(_memos);
-        }
-
-        BuildDays();
-    }
-
     private void BuildDays()
     {
         var first = new DateTime(_currentMonth.Year, _currentMonth.Month, 1);
@@ -302,9 +180,7 @@ public partial class MainWindow : Window
         for (var offset = 0; offset < 42; offset++)
         {
             var date = start.AddDays(offset);
-            var key = date.ToString("yyyy-MM-dd");
             var monthStart = new DateTime(date.Year, date.Month, 1);
-            _memos.TryGetValue(key, out var memo);
             holidays.TryGetValue(date.Date, out var holidayName);
             Days.Add(new CalendarDay
             {
@@ -316,8 +192,7 @@ public partial class MainWindow : Window
                 IsSaturday = date.DayOfWeek == DayOfWeek.Saturday,
                 IsHoliday = !string.IsNullOrWhiteSpace(holidayName),
                 DayText = offset == 0 || date.Day == 1 ? $"{date.Month}월 {date.Day}" : date.Day.ToString(),
-                HolidayName = holidayName ?? "",
-                Text = memo is { Deleted: false } ? memo.Text : ""
+                HolidayName = holidayName ?? ""
             });
         }
     }
