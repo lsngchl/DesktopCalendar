@@ -63,6 +63,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="12,8" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="ClipToBounds" Value="True" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsPreviousMonth}" Value="True">
                     <Setter Property="Background" Value="#26141B20" />
@@ -120,6 +121,29 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="EventText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#F4FFFFFF" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#E6000000" BlurRadius="3" ShadowDepth="1" Opacity="0.9" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MoreText" TargetType="TextBlock" BasedOn="{StaticResource EventText}">
+            <Setter Property="Foreground" Value="#B8FFFFFF" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Margin" Value="3,0,0,0" />
+        </Style>
+
+        <Style x:Key="StatusText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFFFB9B1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </Window.Resources>
 
     <Border x:Name="CalendarShell"
@@ -129,6 +153,8 @@
             CornerRadius="4">
         <Border.ContextMenu>
             <ContextMenu>
+                <MenuItem Header="새로 고침" Click="Refresh_Click" />
+                <Separator />
                 <MenuItem Header="닫기" Click="Close_Click" />
             </ContextMenu>
         </Border.ContextMenu>
@@ -146,6 +172,9 @@
                     BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TopBar_MouseLeftButtonDown">
                 <Grid Margin="8,0">
+                    <TextBlock x:Name="StatusText"
+                               Margin="4,0,0,0"
+                               Style="{StaticResource StatusText}" />
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center">
@@ -165,7 +194,9 @@
                 <TextBlock Text="토요일" Foreground="#FFB9D5FF" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" />
             </UniformGrid>
 
-            <ItemsControl Grid.Row="2" ItemsSource="{Binding Days}">
+            <ItemsControl Grid.Row="2"
+                          ItemsSource="{Binding Days}"
+                          SizeChanged="DaysGrid_SizeChanged">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <UniformGrid Columns="7" Rows="6" />
@@ -173,12 +204,47 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type models:CalendarDay}">
-                        <Border Style="{StaticResource CalendarCell}">
+                        <Border Style="{StaticResource CalendarCell}"
+                                MouseLeftButtonDown="DayCell_MouseLeftButtonDown">
                             <StackPanel>
                                 <TextBlock Text="{Binding DayText}"
                                            Style="{StaticResource DateText}" />
                                 <TextBlock Text="{Binding HolidayName}"
                                            Style="{StaticResource HolidayText}" />
+                                <ItemsControl ItemsSource="{Binding Events}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type models:DayEvent}">
+                                            <Border Height="17"
+                                                    Margin="0,0,0,1"
+                                                    Padding="3,0"
+                                                    CornerRadius="3"
+                                                    Background="{Binding Background}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Ellipse x:Name="Dot"
+                                                             Width="6"
+                                                             Height="6"
+                                                             Margin="0,0,5,0"
+                                                             VerticalAlignment="Center"
+                                                             Fill="{Binding Color}" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Text}"
+                                                               Style="{StaticResource EventText}" />
+                                                </Grid>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsAllDay}" Value="True">
+                                                    <Setter TargetName="Dot" Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding MoreText}"
+                                           Style="{StaticResource MoreText}" />
                             </StackPanel>
                         </Border>
                     </DataTemplate>

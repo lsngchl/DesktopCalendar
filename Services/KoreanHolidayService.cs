@@ -1,4 +1,5 @@
 using System.Globalization;
+using IcsCalendar = Ical.Net.Calendar;
 
 namespace DesktopCalendar.Services;
 
@@ -14,8 +15,10 @@ public sealed class KoreanHolidayService
     private sealed record HolidayCandidate(DateTime Date, string Name, SubstituteRule SubstituteRule);
 
     private static readonly KoreanLunisolarCalendar LunarCalendar = new();
+    private static readonly string[] FeedHolidayDescriptions = ["공휴일", "Public holiday"];
 
-    public IReadOnlyDictionary<DateTime, string> GetHolidays(DateTime start, DateTime end)
+    // Rules cover the regular holidays offline; the Google feed adds the irregular ones such as election days.
+    public IReadOnlyDictionary<DateTime, string> GetHolidays(DateTime start, DateTime end, IcsCalendar? feed)
     {
         start = start.Date;
         end = end.Date;
@@ -29,22 +32,48 @@ public sealed class KoreanHolidayService
             pair => pair.Value.Select(candidate => candidate.Name).Distinct().ToList());
         var occupied = new HashSet<DateTime>(regularByDate.Keys);
 
-        foreach (var candidate in candidates.OrderBy(candidate => candidate.Date))
+        // Holidays that overlap on one date earn a single substitute day between them.
+        foreach (var (date, sameDateCandidates) in regularByDate.OrderBy(pair => pair.Key))
         {
-            if (!NeedsSubstituteHoliday(candidate, regularByDate[candidate.Date.Date]))
+            if (!sameDateCandidates.Any(candidate => NeedsSubstituteHoliday(candidate, sameDateCandidates)))
             {
                 continue;
             }
 
-            var substituteDate = NextSubstituteDate(candidate.Date, occupied);
+            var substituteDate = NextSubstituteDate(date, occupied);
             occupied.Add(substituteDate);
             AddName(namesByDate, substituteDate, "대체공휴일");
+        }
+
+        foreach (var (date, name) in FeedHolidays(feed))
+        {
+            if (!namesByDate.ContainsKey(date))
+            {
+                AddName(namesByDate, date, name);
+            }
         }
 
         return namesByDate
             .Where(pair => pair.Key >= start && pair.Key <= end)
             .OrderBy(pair => pair.Key)
             .ToDictionary(pair => pair.Key, pair => string.Join(" · ", pair.Value));
+    }
+
+    private static IEnumerable<(DateTime Date, string Name)> FeedHolidays(IcsCalendar? feed)
+    {
+        if (feed is null)
+        {
+            yield break;
+        }
+
+        foreach (var holiday in feed.Events)
+        {
+            if (holiday.DtStart is { HasTime: false } start
+                && FeedHolidayDescriptions.Contains(holiday.Description?.Trim(), StringComparer.Ordinal))
+            {
+                yield return (start.Date.ToDateTime(TimeOnly.MinValue), holiday.Summary ?? "");
+            }
+        }
     }
 
     private static List<HolidayCandidate> BuildCandidates(int startYear, int endYear)
@@ -74,6 +103,12 @@ public sealed class KoreanHolidayService
 
         Add(candidates, year, 5, 5, "어린이날", SubstituteRule.SaturdaySundayOrOverlap);
         Add(candidates, year, 6, 6, "현충일", SubstituteRule.None);
+
+        if (year >= 2026)
+        {
+            Add(candidates, year, 7, 17, "제헌절", SubstituteRule.SaturdaySundayOrOverlap);
+        }
+
         Add(candidates, year, 8, 15, "광복절", SubstituteRule.SaturdaySundayOrOverlap);
         Add(candidates, year, 10, 3, "개천절", SubstituteRule.SaturdaySundayOrOverlap);
         Add(candidates, year, 10, 9, "한글날", SubstituteRule.SaturdaySundayOrOverlap);

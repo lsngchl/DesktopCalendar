@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
@@ -27,14 +28,26 @@ public partial class MainWindow : Window
     private const int WmLeftButtonDoubleClick = 0x0203;
     private const int MaActivate = 1;
     private const int MaNoActivate = 3;
+    private const double CellVerticalPadding = 16;
+    private const double DateLineHeight = 18;
+    private const double HolidayLineHeight = 20;
+    private const double EventLineHeight = 18;
+    private static readonly TimeSpan FeedRefreshInterval = TimeSpan.FromMinutes(5);
 
     private readonly SettingsService _settingsService = new();
     private readonly KoreanHolidayService _holidayService = new();
+    private readonly CalendarFeedService _feeds = new();
     private readonly DesktopHostService _desktopHost = new();
     private readonly DispatcherTimer _desktopRepairTimer = new();
+    private readonly DispatcherTimer _feedRefreshTimer = new();
 
     private AppSettings _settings;
+    private DateTime _today = DateTime.Today;
     private DateTime _currentMonth;
+    private DateTime? _eventsRangeStart;
+    private Dictionary<DateOnly, List<DayEvent>> _events = [];
+    private double _cellHeight;
+    private bool _isRefreshing;
     private bool _suppressBoundsSave;
     private bool _isDraggingShell;
     private Point _dragStartScreen;
@@ -44,7 +57,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         _settings = _settingsService.Load();
-        _currentMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        _currentMonth = new DateTime(_today.Year, _today.Month, 1);
+        _feeds.LoadCache();
 
         DataContext = this;
         InitializeComponent();
@@ -56,9 +70,10 @@ public partial class MainWindow : Window
 
     public ObservableCollection<CalendarDay> Days { get; } = [];
 
-    private void Window_Loaded(object sender, RoutedEventArgs e)
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         _ = Dispatcher.BeginInvoke(AttachToDesktop, DispatcherPriority.ApplicationIdle);
+        await RefreshFeedsAsync();
     }
 
     private void Window_SourceInitialized(object? sender, EventArgs e)
@@ -110,6 +125,50 @@ public partial class MainWindow : Window
         _desktopRepairTimer.Interval = TimeSpan.FromSeconds(3);
         _desktopRepairTimer.Tick += (_, _) => _desktopHost.Repair(this);
         _desktopRepairTimer.Start();
+
+        _feedRefreshTimer.Interval = FeedRefreshInterval;
+        _feedRefreshTimer.Tick += async (_, _) => await RefreshFeedsAsync();
+        _feedRefreshTimer.Start();
+    }
+
+    private async Task RefreshFeedsAsync()
+    {
+        if (_isRefreshing)
+        {
+            return;
+        }
+
+        _isRefreshing = true;
+        try
+        {
+            var succeeded = await _feeds.RefreshAsync();
+            StatusText.Text = !succeeded ? $"{DateTime.Now:HH:mm} 갱신 실패"
+                : !_feeds.HasSources ? "calendars.json에 캘린더 주소를 넣으세요"
+                : "";
+            FollowToday();
+            _eventsRangeStart = null;
+            BuildDays();
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    private void FollowToday()
+    {
+        var today = DateTime.Today;
+        if (today == _today)
+        {
+            return;
+        }
+
+        if (_currentMonth == new DateTime(_today.Year, _today.Month, 1))
+        {
+            _currentMonth = new DateTime(today.Year, today.Month, 1);
+        }
+
+        _today = today;
     }
 
     private void Previous_Click(object sender, RoutedEventArgs e)
@@ -170,11 +229,49 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        await RefreshFeedsAsync();
+    }
+
+    private void DayCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount != 2 || sender is not FrameworkElement { DataContext: CalendarDay day })
+        {
+            return;
+        }
+
+        var date = day.Date;
+        Process.Start(new ProcessStartInfo($"https://calendar.google.com/calendar/r/day/{date.Year}/{date.Month}/{date.Day}")
+        {
+            UseShellExecute = true
+        });
+        e.Handled = true;
+    }
+
+    private void DaysGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var cellHeight = Math.Floor(e.NewSize.Height / 6);
+        if (cellHeight == _cellHeight)
+        {
+            return;
+        }
+
+        _cellHeight = cellHeight;
+        BuildDays();
+    }
+
     private void BuildDays()
     {
         var first = new DateTime(_currentMonth.Year, _currentMonth.Month, 1);
         var start = first.AddDays(-(int)first.DayOfWeek);
-        var holidays = _holidayService.GetHolidays(start, start.AddDays(41));
+        var last = start.AddDays(41);
+        var holidays = _holidayService.GetHolidays(start, last, _feeds.Holidays);
+        if (_eventsRangeStart != start)
+        {
+            _events = _feeds.GetEvents(DateOnly.FromDateTime(start), DateOnly.FromDateTime(last));
+            _eventsRangeStart = start;
+        }
 
         Days.Clear();
         for (var offset = 0; offset < 42; offset++)
@@ -182,19 +279,36 @@ public partial class MainWindow : Window
             var date = start.AddDays(offset);
             var monthStart = new DateTime(date.Year, date.Month, 1);
             holidays.TryGetValue(date.Date, out var holidayName);
+            var isHoliday = !string.IsNullOrWhiteSpace(holidayName);
+            var (events, moreText) = FitEvents(_events.GetValueOrDefault(DateOnly.FromDateTime(date)) ?? [], isHoliday);
             Days.Add(new CalendarDay
             {
                 Date = date,
                 IsPreviousMonth = monthStart < first,
                 IsNextMonth = monthStart > first,
-                IsToday = date.Date == DateTime.Today,
+                IsToday = date.Date == _today,
                 IsSunday = date.DayOfWeek == DayOfWeek.Sunday,
                 IsSaturday = date.DayOfWeek == DayOfWeek.Saturday,
-                IsHoliday = !string.IsNullOrWhiteSpace(holidayName),
+                IsHoliday = isHoliday,
                 DayText = offset == 0 || date.Day == 1 ? $"{date.Month}월 {date.Day}" : date.Day.ToString(),
-                HolidayName = holidayName ?? ""
+                HolidayName = holidayName ?? "",
+                Events = events,
+                MoreText = moreText
             });
         }
+    }
+
+    private (IReadOnlyList<DayEvent> Events, string MoreText) FitEvents(List<DayEvent> events, bool hasHoliday)
+    {
+        var available = _cellHeight - CellVerticalPadding - DateLineHeight - (hasHoliday ? HolidayLineHeight : 0);
+        var lines = Math.Max(0, (int)(available / EventLineHeight));
+        if (events.Count <= lines)
+        {
+            return (events, "");
+        }
+
+        var shown = Math.Max(0, lines - 1);
+        return (events.Take(shown).ToList(), $"+{events.Count - shown}");
     }
 
     private void Close_Click(object sender, RoutedEventArgs e)

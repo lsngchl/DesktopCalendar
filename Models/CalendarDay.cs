@@ -12,4 +12,6 @@ public sealed class CalendarDay
 
     public string DayText { get; init; } = "";
     public string HolidayName { get; init; } = "";
+    public IReadOnlyList<DayEvent> Events { get; init; } = [];
+    public string MoreText { get; init; } = "";
 }

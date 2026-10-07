@@ -9,6 +9,8 @@ public static class AppPaths
         "DesktopCalendar");
 
     public static string SettingsPath => Path.Combine(AppDataRoot, "settings.json");
+    public static string CalendarsPath => Path.Combine(AppDataRoot, "calendars.json");
+    public static string FeedCacheRoot => Path.Combine(AppDataRoot, "cache");
 
     public static void Ensure()
     {
